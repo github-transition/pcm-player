@@ -19,6 +19,8 @@ class PCMPlayer {
     this.typedArray = this.getTypedArray()
     this.initAudioContext()
     this.bindAudioContextEvent()
+    this.activeBufferSources = new Set(); // 跟踪所有活动的buffer sources
+
   }
 
   getConvertValue() {
@@ -123,6 +125,7 @@ class PCMPlayer {
       clearInterval(this.interval)
     }
     this.samples = null
+    this.activeBufferSources.clear();
     this.audioCtx.close()
     this.audioCtx = null
   }
@@ -131,9 +134,18 @@ class PCMPlayer {
     if (!this.samples.length) return
     const self = this
     var bufferSource = this.audioCtx.createBufferSource()
+
+    // 将新的buffer source添加到活动集合中
+    this.activeBufferSources.add(bufferSource);
+    
     if (typeof this.option.onended === 'function') {
       bufferSource.onended = function (event) {
-        self.option.onended(this, event)
+          // 从活动集合中移除已结束的buffer source
+          self.activeBufferSources.delete(bufferSource);
+          // 只有当所有buffer sources都结束时才触发onended回调
+          if (self.activeBufferSources.size === 0) {
+            self.option.onended(bufferSource, event);
+          }
       }
     }
     const length = this.samples.length / this.option.channels
